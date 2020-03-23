@@ -1,6 +1,7 @@
 package com.nordnetab.chcp.main;
 
 import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
@@ -44,6 +45,7 @@ import org.apache.cordova.CordovaArgs;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.CordovaWebViewEngine;
 import org.apache.cordova.PluginResult;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -51,6 +53,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -618,6 +622,8 @@ public class HotCodePushPlugin extends CordovaPlugin {
 
         // make sure, that index page exists
         String external = Paths.get(fileStructure.getWwwFolder(), strippedIndexPage);
+
+        Log.d("CHCP", "External :" + external);
         if (!new File(external).exists()) {
             Log.d("CHCP", "External starting page not found. Aborting page change.");
             return;
@@ -625,9 +631,45 @@ public class HotCodePushPlugin extends CordovaPlugin {
 
         // load index page from the external source
         external = Paths.get(fileStructure.getWwwFolder(), indexPage);
-        webView.loadUrlIntoView(FILE_PREFIX + external, false);
-
+        String url = convertFileSrc(FILE_PREFIX + external);
         Log.d("CHCP", "Loading external page: " + external);
+        CordovaWebViewEngine engine = webView.getEngine();
+        if(engine.getClass().getSimpleName().equals("IonicWebViewEngine")){
+            try {
+                String serverBasePath = Paths.get(fileStructure.getWwwFolder());
+                Method setServerBasePath = engine.getClass().getDeclaredMethod("setServerBasePath", String.class);
+                setServerBasePath.invoke(engine, new Object[]{serverBasePath});
+            }catch (NoSuchMethodException ex){
+                Log.d("CHCP", "method [setServerBasePath] not found.");
+                webView.loadUrlIntoView(url, false);
+            } catch (IllegalAccessException e) {
+                Log.d("CHCP", "method [setServerBasePath] call failure.");
+                webView.loadUrlIntoView(url, false);
+            } catch (InvocationTargetException e) {
+                Log.d("CHCP", "method [setServerBasePath]  call failure.");
+                webView.loadUrlIntoView(url, false);
+            }
+        }else{
+            webView.loadUrlIntoView(url, false);
+        }
+
+    }
+
+
+    private String convertFileSrc(String url){
+        if(url == null){
+            return null;
+        }
+        if(url.startsWith("/")){
+            return "http://localhost" + "/_app_file_" + url;
+        }
+        if(url.startsWith("file://")){
+            return "http://localhost"+ url.replace("file://", "/_app_file_");
+        }
+        if(url.startsWith("content://")){
+            return "http://localhost" +url.replace("content:/", "/_app_content_");
+        }
+        return url;
     }
 
     /**
@@ -643,9 +685,10 @@ public class HotCodePushPlugin extends CordovaPlugin {
         ConfigXmlParser parser = new ConfigXmlParser();
         parser.parse(cordova.getActivity());
         String url = parser.getLaunchUrl();
-
-        startingPage = url.replace(LOCAL_ASSETS_FOLDER, "");
-
+        Uri uri = Uri.parse(url);
+        startingPage = uri.getLastPathSegment();
+//        startingPage = url.replace(LOCAL_ASSETS_FOLDER, "");
+        Log.d("CHCP", "startingPage is: " + startingPage);
         return startingPage;
     }
 
