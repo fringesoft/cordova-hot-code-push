@@ -14,6 +14,7 @@ public final class JSAction {
     public static final String REQUEST_APP_UPDATE = "jsRequestAppUpdate";
     public static final String IS_UPDATE_AVAILABLE_FOR_INSTALLATION = "jsIsUpdateAvailableForInstallation";
     public static final String GET_VERSION_INFO = "jsGetVersionInfo";
+    public static final String CHECK_UPDATE="jsCheckUpdate";
 
     // Private API
     public static final String INIT = "jsInitPlugin";

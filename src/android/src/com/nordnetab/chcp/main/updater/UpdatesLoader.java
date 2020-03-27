@@ -51,6 +51,25 @@ public class UpdatesLoader {
         return ChcpError.NONE;
     }
 
+    public static ChcpError checkUpdate(final UpdateDownloadRequest request) {
+        // if download already in progress - exit
+        if (isExecuting) {
+            return ChcpError.DOWNLOAD_ALREADY_IN_PROGRESS;
+        }
+
+        // if installation is in progress - exit
+        if (UpdatesInstaller.isInstalling()) {
+            return ChcpError.CANT_DOWNLOAD_UPDATE_WHILE_INSTALLATION_IN_PROGRESS;
+        }
+
+        isExecuting = true;
+
+        final UpdateCheckWorker task = new UpdateCheckWorker(request);
+        executeTask(task);
+
+        return ChcpError.NONE;
+    }
+
     private static void executeTask(final WorkerTask task) {
         new Thread(new Runnable() {
             @Override

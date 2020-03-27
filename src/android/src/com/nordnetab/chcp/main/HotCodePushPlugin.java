@@ -17,6 +17,7 @@ import com.nordnetab.chcp.main.events.BeforeAssetsInstalledEvent;
 import com.nordnetab.chcp.main.events.BeforeInstallEvent;
 import com.nordnetab.chcp.main.events.NothingToInstallEvent;
 import com.nordnetab.chcp.main.events.NothingToUpdateEvent;
+import com.nordnetab.chcp.main.events.UpdateCheckEvent;
 import com.nordnetab.chcp.main.events.UpdateDownloadErrorEvent;
 import com.nordnetab.chcp.main.events.UpdateInstallationErrorEvent;
 import com.nordnetab.chcp.main.events.UpdateInstalledEvent;
@@ -246,6 +247,8 @@ public class HotCodePushPlugin extends CordovaPlugin {
         boolean cmdProcessed = true;
         if (JSAction.INIT.equals(action)) {
             jsInit(callbackContext);
+        }else if(JSAction.CHECK_UPDATE.equals(action)){
+            jsCheckUpdate(callbackContext, args);
         } else if (JSAction.FETCH_UPDATE.equals(action)) {
             jsFetchUpdate(callbackContext, args);
         } else if (JSAction.INSTALL_UPDATE.equals(action)) {
@@ -349,6 +352,21 @@ public class HotCodePushPlugin extends CordovaPlugin {
         }
 
         fetchUpdate(callback, fetchOptions);
+    }
+
+    private void jsCheckUpdate(CallbackContext callback, CordovaArgs args) {
+        if (!isPluginReadyForWork) {
+            sendPluginNotReadyToWork(UpdateDownloadErrorEvent.EVENT_NAME, callback);
+            return;
+        }
+
+        FetchUpdateOptions fetchOptions = null;
+        try {
+            fetchOptions = new FetchUpdateOptions(args.optJSONObject(0));
+        } catch (JSONException ignored) {
+        }
+
+        checkUpdate(callback, fetchOptions);
     }
 
     /**
@@ -462,11 +480,56 @@ public class HotCodePushPlugin extends CordovaPlugin {
         data.put("currentWebVersion", pluginInternalPrefs.getCurrentReleaseVersionName());
         data.put("readyToInstallWebVersion", pluginInternalPrefs.getReadyForInstallationReleaseVersionName());
         data.put("previousWebVersion", pluginInternalPrefs.getPreviousReleaseVersionName());
+        data.put("wwwFolderInstalled", pluginInternalPrefs.isWwwFolderInstalled());
         data.put("appVersion", VersionHelper.applicationVersionName(context));
         data.put("buildVersion", VersionHelper.applicationVersionCode(context));
 
         final PluginResult pluginResult = PluginResultHelper.createPluginResult(null, data, null);
         callback.sendPluginResult(pluginResult);
+    }
+
+
+    private void checkUpdate(){
+
+    }
+
+    private void checkUpdate(CallbackContext jsCallback, FetchUpdateOptions fetchOptions){
+        if (!isPluginReadyForWork) {
+            return;
+        }
+
+        Map<String, String> requestHeaders = null;
+        String configURL = chcpXmlConfig.getConfigUrl();
+        if (fetchOptions == null) {
+            fetchOptions = defaultFetchUpdateOptions;
+        }
+        if (fetchOptions != null) {
+            requestHeaders = fetchOptions.getRequestHeaders();
+            final String optionalConfigURL = fetchOptions.getConfigURL();
+            if (!TextUtils.isEmpty(optionalConfigURL)) {
+                configURL = optionalConfigURL;
+            }
+        }
+
+        final UpdateDownloadRequest request = UpdateDownloadRequest.builder(cordova.getActivity())
+                .setConfigURL(configURL)
+                .setCurrentNativeVersion(chcpXmlConfig.getNativeInterfaceVersion())
+                .setCurrentReleaseVersion(pluginInternalPrefs.getCurrentReleaseVersionName())
+                .setRequestHeaders(requestHeaders)
+                .build();
+
+        final ChcpError error = UpdatesLoader.checkUpdate(request);
+        if (error != ChcpError.NONE) {
+            if (jsCallback != null) {
+                PluginResult errorResult = PluginResultHelper.createPluginResult(UpdateDownloadErrorEvent.EVENT_NAME, null, error);
+                jsCallback.sendPluginResult(errorResult);
+            }
+            return;
+        }
+
+        if (jsCallback != null) {
+            downloadJsCallback = jsCallback;
+        }
     }
 
     // convenience method
@@ -636,6 +699,7 @@ public class HotCodePushPlugin extends CordovaPlugin {
         CordovaWebViewEngine engine = webView.getEngine();
         if(engine.getClass().getSimpleName().equals("IonicWebViewEngine")){
             try {
+                webView.clearHistory();
                 String serverBasePath = Paths.get(fileStructure.getWwwFolder());
                 Method setServerBasePath = engine.getClass().getDeclaredMethod("setServerBasePath", String.class);
                 setServerBasePath.invoke(engine, new Object[]{serverBasePath});
@@ -800,6 +864,21 @@ public class HotCodePushPlugin extends CordovaPlugin {
     @SuppressWarnings("unused")
     @Subscribe
     public void onEvent(NothingToUpdateEvent event) {
+        Log.d("CHCP", "Nothing to update");
+
+        PluginResult jsResult = PluginResultHelper.pluginResultFromEvent(event);
+
+        //notify JS
+        if (downloadJsCallback != null) {
+            downloadJsCallback.sendPluginResult(jsResult);
+            downloadJsCallback = null;
+        }
+
+        sendMessageToDefaultCallback(jsResult);
+    }
+
+    @Subscribe
+    public void onEvent(UpdateCheckEvent event) {
         Log.d("CHCP", "Nothing to update");
 
         PluginResult jsResult = PluginResultHelper.pluginResultFromEvent(event);

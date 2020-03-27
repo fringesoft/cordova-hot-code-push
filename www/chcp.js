@@ -1,20 +1,17 @@
-
-
-var exec = require('cordova/exec'),
-  channel = require('cordova/channel'),
-
+var exec = require("cordova/exec"),
+  channel = require("cordova/channel"),
   // Reference name for the plugin
-  PLUGIN_NAME = 'HotCodePush',
-
+  PLUGIN_NAME = "HotCodePush",
   // Plugin methods on the native side that can be called from JavaScript
   pluginNativeMethod = {
-    INITIALIZE: 'jsInitPlugin',
-    FETCH_UPDATE: 'jsFetchUpdate',
-    INSTALL_UPDATE: 'jsInstallUpdate',
-    CONFIGURE: 'jsConfigure',
-    REQUEST_APP_UPDATE: 'jsRequestAppUpdate',
-    IS_UPDATE_AVAILABLE_FOR_INSTALLATION: 'jsIsUpdateAvailableForInstallation',
-    GET_INFO: 'jsGetVersionInfo'
+    INITIALIZE: "jsInitPlugin",
+    CHECK_UPDATE: "jsCheckUpdate",
+    FETCH_UPDATE: "jsFetchUpdate",
+    INSTALL_UPDATE: "jsInstallUpdate",
+    CONFIGURE: "jsConfigure",
+    REQUEST_APP_UPDATE: "jsRequestAppUpdate",
+    IS_UPDATE_AVAILABLE_FOR_INSTALLATION: "jsIsUpdateAvailableForInstallation",
+    GET_INFO: "jsGetVersionInfo"
   };
 
 // Called when Cordova is ready for work.
@@ -34,7 +31,7 @@ function nativeCallback(msg) {
   // parse call arguments
   var resultObj = processMessageFromNative(msg);
   if (resultObj.action == null) {
-    console.log('Action is not provided, skipping');
+    console.log("Action is not provided, skipping");
     return;
   }
 
@@ -57,13 +54,13 @@ function processMessageFromNative(msg) {
 
   try {
     var resultObj = JSON.parse(msg);
-    if (resultObj.hasOwnProperty('error')) {
+    if (resultObj.hasOwnProperty("error")) {
       errorContent = resultObj.error;
     }
-    if (resultObj.hasOwnProperty('data')) {
+    if (resultObj.hasOwnProperty("data")) {
       dataContent = resultObj.data;
     }
-    if (resultObj.hasOwnProperty('action')) {
+    if (resultObj.hasOwnProperty("action")) {
       actionId = resultObj.action;
     }
   } catch (err) {}
@@ -109,8 +106,13 @@ function ensureCustomEventExists() {
       cancelable: false,
       detail: undefined
     };
-    var evt = document.createEvent('CustomEvent');
-    evt.initCustomEvent(event, params.bubbles, params.cancelable, params.detail);
+    var evt = document.createEvent("CustomEvent");
+    evt.initCustomEvent(
+      event,
+      params.bubbles,
+      params.cancelable,
+      params.detail
+    );
     return evt;
   };
 
@@ -130,7 +132,7 @@ function broadcastEventFromNative(nativeMessage) {
   }
 
   var chcpEvent = new CustomEvent(nativeMessage.action, {
-    'detail': params
+    detail: params
   });
   document.dispatchEvent(chcpEvent);
 }
@@ -142,7 +144,6 @@ function broadcastEventFromNative(nativeMessage) {
  * May be used by developers to send commands to the plugin.
  */
 var chcp = {
-
   // Plugin error codes
   error: {
     NOTHING_TO_INSTALL: 1,
@@ -171,18 +172,18 @@ var chcp = {
 
   // Plugin events
   event: {
-    BEFORE_ASSETS_INSTALLATION: 'chcp_beforeAssetsInstalledOnExternalStorage',
-    ASSETS_INSTALLATION_FAILED: 'chcp_assetsInstallationError',
-    ASSETS_INSTALLED: 'chcp_assetsInstalledOnExternalStorage',
+    BEFORE_ASSETS_INSTALLATION: "chcp_beforeAssetsInstalledOnExternalStorage",
+    ASSETS_INSTALLATION_FAILED: "chcp_assetsInstallationError",
+    ASSETS_INSTALLED: "chcp_assetsInstalledOnExternalStorage",
 
-    NOTHING_TO_UPDATE: 'chcp_nothingToUpdate',
-    UPDATE_LOAD_FAILED: 'chcp_updateLoadFailed',
-    UPDATE_IS_READY_TO_INSTALL: 'chcp_updateIsReadyToInstall',
+    NOTHING_TO_UPDATE: "chcp_nothingToUpdate",
+    UPDATE_LOAD_FAILED: "chcp_updateLoadFailed",
+    UPDATE_IS_READY_TO_INSTALL: "chcp_updateIsReadyToInstall",
 
-    BEFORE_UPDATE_INSTALLATION: 'chcp_beforeInstall',
-    UPDATE_INSTALLATION_FAILED: 'chcp_updateInstallFailed',
-    UPDATE_INSTALLED: 'chcp_updateInstalled',
-    NOTHING_TO_INSTALL: 'chcp_nothingToInstall'
+    BEFORE_UPDATE_INSTALLATION: "chcp_beforeInstall",
+    UPDATE_INSTALLATION_FAILED: "chcp_updateInstallFailed",
+    UPDATE_INSTALLED: "chcp_updateInstalled",
+    NOTHING_TO_INSTALL: "chcp_nothingToInstall"
   },
 
   /**
@@ -214,7 +215,11 @@ var chcp = {
    * @param {Callback()} onStoreOpenCallback - called when user redirects to the Store
    * @param {Callback()} onUserDismissedDialogCallback - called when user declines to go to the Store
    */
-  requestApplicationUpdate: function(message, onStoreOpenCallback, onUserDismissedDialogCallback) {
+  requestApplicationUpdate: function(
+    message,
+    onStoreOpenCallback,
+    onUserDismissedDialogCallback
+  ) {
     if (message == undefined || message.length == 0) {
       return;
     }
@@ -231,9 +236,18 @@ var chcp = {
       }
     };
 
-    exec(onSuccessInnerCallback, onFailureInnerCallback, PLUGIN_NAME, pluginNativeMethod.REQUEST_APP_UPDATE, [message]);
+    exec(
+      onSuccessInnerCallback,
+      onFailureInnerCallback,
+      PLUGIN_NAME,
+      pluginNativeMethod.REQUEST_APP_UPDATE,
+      [message]
+    );
   },
 
+  checkUpdate: function(callback, options) {
+    callNativeMethod(pluginNativeMethod.CHECK_UPDATE, options, callback);
+  },
   /**
    * Check if any new content is available on the server and download it.
    * Usually this is done automatically by the plugin, but can be triggered at any time from the web page.
@@ -263,7 +277,11 @@ var chcp = {
    * @param {Callback(error, data)} callback - called, when information is retrieved from the native side.
    */
   isUpdateAvailableForInstallation: function(callback) {
-    callNativeMethod(pluginNativeMethod.IS_UPDATE_AVAILABLE_FOR_INSTALLATION, null, callback);
+    callNativeMethod(
+      pluginNativeMethod.IS_UPDATE_AVAILABLE_FOR_INSTALLATION,
+      null,
+      callback
+    );
   },
 
   /**
